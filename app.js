@@ -14,14 +14,27 @@
 // ──────────────────────────────────────────────
 // CONSTANTS
 // ──────────────────────────────────────────────
-const CORS_PROXY = 'https://corsproxy.io/?url=';
-const STEAMSPY_BASE = 'https://steamspy.com/api.php';
-const REFRESH_MS = 60_000;
+const PROXIES = [
+    'https://corsproxy.io/?url=',
+    'https://api.allorigins.win/raw?url=',
+];
 
-const STEAM_IMG = id => `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`;
-const STEAM_HERO = id => `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_hero.jpg`;
-const STEAM_LINK = id => `https://store.steampowered.com/app/${id}/`;
-const proxied = url => CORS_PROXY + encodeURIComponent(url);
+async function robustFetch(url, resultValidator = (d) => true) {
+    let lastError = null;
+    for (const proxy of PROXIES) {
+        try {
+            const fullUrl = proxy + encodeURIComponent(url);
+            const res = await fetch(fullUrl);
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && resultValidator(data)) return data;
+        } catch (e) {
+            lastError = e;
+            console.warn(`Proxy ${proxy} failed for ${url}`);
+        }
+    }
+    throw lastError || new Error(`All proxies failed for ${url}`);
+}
 
 // ──────────────────────────────────────────────
 // DOM REFS
@@ -251,22 +264,27 @@ async function detectUserRegion() {
 async function loadAppList() {
     if (allAppsLoaded) return;
     try {
-        const data = await fetch(proxied('https://api.steampowered.com/ISteamApps/GetAppList/v2/')).then(r => r.json());
-        allApps = (data?.applist?.apps || []).filter(a => a.name && a.name.trim());
+        const data = await robustFetch('https://api.steampowered.com/ISteamApps/GetAppList/v2/', d => d?.applist?.apps);
+        allApps = (data.applist.apps || []).filter(a => a && a.name && a.name.trim());
         allAppsLoaded = true;
-    } catch (e) { console.warn('App list failed:', e); }
+    } catch (e) { console.warn('App list fallback:', e); }
 }
 
 async function steamStoreSearch(term) {
     const raw = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=${USER_REGION.lang}&cc=${USER_REGION.cc}&category1=998`;
-    const data = await fetch(proxied(raw)).then(r => r.json());
-    return (data.items || []).map(item => ({ appid: item.id, name: item.name }));
+    try {
+        const data = await robustFetch(raw, d => d && Array.isArray(d.items));
+        return (data.items || []).map(item => ({ appid: item.id, name: item.name }));
+    } catch (e) {
+        console.error('Search fetch failed:', e);
+        return [];
+    }
 }
 
 async function steamStoreDetails(appId) {
     try {
         const raw = `https://store.steampowered.com/api/appdetails?appids=${appId}&l=${USER_REGION.lang}&cc=${USER_REGION.cc}`;
-        const json = await fetch(proxied(raw)).then(r => r.json());
+        const json = await robustFetch(raw, d => d && d[appId]);
         const entry = json?.[appId];
         return entry?.success ? entry.data : null;
     } catch (e) { console.warn('Store details failed:', e); return null; }
@@ -275,14 +293,14 @@ async function steamStoreDetails(appId) {
 async function steamspyApp(appId) {
     try {
         const raw = `${STEAMSPY_BASE}?request=appdetails&appid=${appId}`;
-        return await fetch(proxied(raw)).then(r => r.json());
-    } catch (e) { console.warn('SteamSpy failed:', e); return null; }
+        return await robustFetch(raw, d => d && (d.appid || d.id));
+    } catch (e) { console.warn('SteamSpy details failed:', e); return null; }
 }
 
 async function getCurrentPlayers(appId) {
     try {
         const raw = `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${appId}`;
-        const json = await fetch(proxied(raw)).then(r => r.json());
+        const json = await robustFetch(raw, d => d && d.response);
         return json?.response?.player_count ?? null;
     } catch (e) { return null; }
 }
@@ -664,9 +682,12 @@ function renderInfiniteGrid(data, containerId, reset = true) {
     const page = parseInt(grid.dataset.page) || 0;
     const start = page * ITEMS_PER_PAGE;
     const end = start + ITEMS_PER_PAGE;
-    const slice = data.slice(start, end);
+    const sliceContent = data.slice(start, end);
 
-    slice.forEach((app, i) => grid.appendChild(buildGameCard(app, start + i)));
+    sliceContent.forEach((app, i) => {
+        if (!app || typeof app !== 'object' || (!app.appid && !app.id && !app.name)) return;
+        grid.appendChild(buildGameCard(app, start + i));
+    });
 
     if (end < data.length) {
         setupInfiniteScroll(grid, data, containerId);
@@ -806,17 +827,18 @@ async function loadTrending(type = 'top100in2weeks') {
     try {
         let apps = [];
         if (type === 'top100in2weeks') {
-            const data = await fetch(proxied(`${STEAMSPY_BASE}?request=top100in2weeks`)).then(r => r.json());
-            apps = Object.values(data);
+            const url = `${STEAMSPY_BASE}?request=top100in2weeks`;
+            const data = await robustFetch(url, d => d && typeof d === 'object');
+            apps = Object.values(data).filter(a => a && typeof a === 'object' && (a.appid || a.id));
             sub.textContent = 'Most played Steam games in last 2 weeks (via SteamSpy)';
         } else if (type === 'topsellers') {
             const resultsUrl = `https://store.steampowered.com/search/results/?query&start=0&count=250&filter=topsellers&infinite=1&cc=${USER_REGION.cc}&l=${USER_REGION.lang}`;
-            const json = await fetch(proxied(resultsUrl)).then(r => r.json());
+            const json = await robustFetch(resultsUrl, d => d && d.results_html);
             apps = parseOfficialResults(json.results_html);
             sub.textContent = `Current worldwide top sellers on the Steam Store (${USER_REGION.cc})`;
         } else if (type === 'trending') {
             const resultsUrl = `https://store.steampowered.com/search/results/?query&start=0&count=250&filter=popularnew&infinite=1&cc=${USER_REGION.cc}&l=${USER_REGION.lang}`;
-            const json = await fetch(proxied(resultsUrl)).then(r => r.json());
+            const json = await robustFetch(resultsUrl, d => d && d.results_html);
             apps = parseOfficialResults(json.results_html);
             sub.textContent = `New releases trending right now on Steam (${USER_REGION.cc})`;
         }
