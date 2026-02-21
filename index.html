@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SteamTrack – Ultimate "Pro" Game Dashboard</title>
+  <meta name="description"
+    content="The ultimate Steam aggregator — live players, owner estimates, pricing history, technical specs, and compatibility in one pro dashboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@400;700;900&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Security Headers (CSP) -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.steamstatic.com https://*.steampowered.com https://*.cheapshark.com; connect-src 'self' https://ipapi.co https://corsproxy.io https://store.steampowered.com https://steamspy.com https://www.cheapshark.com https://www.pcgamingwiki.com https://www.protondb.com;" />
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="url(#g1)" stroke-width="2" />
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12c0 2.93 1.26 5.57 3.27 7.43L9 15.7A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5h-.09l-3.57 3.57A9.958 9.958 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z"
+            fill="url(#g1)" />
+          <defs>
+            <linearGradient id="g1" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#00e5ff" />
+              <stop offset="1" stop-color="#7c3aed" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">Steam<span class="logo-accent">Track</span></span>
+      </div>
+      <nav class="nav-pills">
+        <button class="nav-pill active" data-section="search">Search</button>
+        <button class="nav-pill" data-section="trending">Trending</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO SEARCH -->
+  <section class="hero" id="section-search">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <!-- Comparison Tray (Relocated) -->
+      <div id="compareTray" class="compare-tray hidden">
+        <div class="compare-header">
+          <div class="compare-count">Pinned for Comparison: <span id="pinCount">0</span>/5</div>
+          <button id="clearPins" class="clear-pins-btn">Clear All</button>
+        </div>
+        <div id="pinGrid" class="pin-grid"></div>
+      </div>
+
+      <h1 class="hero-title">The <span class="gradient-text">Pro</span> Discovery Engine</h1>
+      <p class="hero-sub">Aggregated stats from Steam, SteamSpy, CheapShark, PCGamingWiki & ProtonDB.</p>
+
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none">
+          <circle cx="11" cy="11" r="7" stroke="#00e5ff" stroke-width="2" />
+          <path d="M20 20l-4-4" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <input id="searchInput" class="search-input" type="text"
+          placeholder="Search for a game... e.g. Black Myth: Wukong, Helldivers 2" autocomplete="off" />
+        <button id="searchBtn" class="search-btn">
+          <span>Search</span>
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+            <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div id="autocomplete" class="autocomplete hidden"></div>
+      </div>
+
+      <div class="quick-picks">
+        <span class="quick-label">Popular:</span>
+        <button class="quick-btn" data-query="Counter-Strike 2">Counter-Strike 2</button>
+        <button class="quick-btn" data-query="Dota 2">Dota 2</button>
+        <button class="quick-btn" data-query="Elden Ring">Elden Ring</button>
+        <button class="quick-btn" data-query="Cyberpunk 2077">Cyberpunk 2077</button>
+        <button class="quick-btn" data-query="PUBG">PUBG</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS SECTION -->
+  <main class="main">
+
+    <div id="loadingSpinner" class="loading-spinner hidden">
+      <div class="spinner-ring"></div>
+      <p>Aggregating multi-source data…</p>
+    </div>
+
+    <div id="errorMsg" class="error-msg hidden">
+      <svg viewBox="0 0 24 24" fill="none" width="32" height="32">
+        <circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="2" />
+        <path d="M12 8v4M12 16h.01" stroke="#ef4444" stroke-width="2" stroke-linecap="round" />
+      </svg>
+      <span id="errorText">Something went wrong.</span>
+    </div>
+
+    <!-- Featured Game Card -->
+    <div id="featuredCard" class="featured-card hidden">
+      <div class="featured-header">
+        <img id="featuredBanner" class="featured-banner" src="" alt="" />
+        <div class="featured-overlay"></div>
+        <div class="featured-meta">
+          <div class="featured-badge">
+            <span class="live-dot"></span>
+            <span id="featuredPlayers">— players online</span>
+          </div>
+          <h2 id="featuredName" class="featured-name"></h2>
+          <!-- Developer / Publisher row -->
+          <p id="featuredDevPub" class="featured-devpub"></p>
+          <p id="featuredDesc" class="featured-desc"></p>
+          <div class="featured-tags" id="featuredTags"></div>
+        </div>
+      </div>
+
+      <!-- Media Gallery (Screenshots & Trailer) -->
+      <div class="featured-media-container">
+        <div id="featuredMedia" class="featured-media"></div>
+      </div>
+
+      <!-- ── 20-STAT GRID ── -->
+      <div class="featured-stats">
+
+        <!-- Group 1: Live & Popularity -->
+        <div class="stat-card">
+          <div class="stat-icon">🟢</div>
+          <div class="stat-value" id="statPlayersVal">—</div>
+          <div class="stat-label">Current Players</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="statCCUVal">—</div>
+          <div class="stat-label">Peak (Yesterday)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value stat-value--sm" id="statOwnersVal">—</div>
+          <div class="stat-label">Est. Owners</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" id="statScoreVal">—</div>
+          <div class="stat-label">Review Score</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📝</div>
+          <div class="stat-value" id="statReviewsCountVal">—</div>
+          <div class="stat-label">Total Reviews</div>
+        </div>
+
+        <!-- Group 2: Financials (Pro) -->
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value" id="statPriceVal">—</div>
+          <div class="stat-label">Steam Price</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💎</div>
+          <div class="stat-value" id="statHistLowVal">—</div>
+          <div class="stat-label">Historical Low</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🏷️</div>
+          <div class="stat-value stat-value--sm" id="statBestDealVal">—</div>
+          <div class="stat-label">Cheapest Deal</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-value" id="statAchievementsVal">—</div>
+          <div class="stat-label">Achievements</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📅</div>
+          <div class="stat-value stat-value--sm" id="statReleaseDateVal">—</div>
+          <div class="stat-label">Release Date</div>
+        </div>
+
+        <!-- Group 3: Playtime & Languages -->
+        <div class="stat-card">
+          <div class="stat-icon">⏱️</div>
+          <div class="stat-value" id="statAvgForeverVal">—</div>
+          <div class="stat-label">Avg Playtime Ever</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🥈</div>
+          <div class="stat-value" id="statMedianForeverVal">—</div>
+          <div class="stat-label">Median Playtime</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📊</div>
+          <div class="stat-value" id="statAvg2wVal">—</div>
+          <div class="stat-label">Avg Playtime 2w</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🌐</div>
+          <div class="stat-value" id="statLanguagesVal">—</div>
+          <div class="stat-label">Languages</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🖥️</div>
+          <div class="stat-value stat-value--sm" id="statPlatformsVal">—</div>
+          <div class="stat-label">Platforms</div>
+        </div>
+
+        <!-- Group 4: Technical & Deck (Pro) -->
+        <div class="stat-card">
+          <div class="stat-icon">💾</div>
+          <div class="stat-value" id="statStorageVal">—</div>
+          <div class="stat-label">Storage Required</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🎮</div>
+          <div class="stat-value" id="statControllerVal">—</div>
+          <div class="stat-label">Controller Status</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📏</div>
+          <div class="stat-value" id="statUltrawideVal">—</div>
+          <div class="stat-label">Ultrawide Support</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔆</div>
+          <div class="stat-value" id="statHDRVal">—</div>
+          <div class="stat-label">HDR Support</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔋</div>
+          <div class="stat-value stat-value--sm" id="statDeckVal">—</div>
+          <div class="stat-label">Steam Deck / Proton</div>
+        </div>
+
+      </div><!-- /featured-stats -->
+
+      <a id="featuredLink" class="steam-link" href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.88 8.17 6.88 9.5l4.62-4.62A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5 3.5 3.5 0 0 1-3.11-1.88L5.5 17l.01.01A9.958 9.958 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" />
+        </svg>
+        View Game on Steam
+      </a>
+    </div>
+
+    <!-- Dynamic Category Results -->
+    <div id="section-tag" class="results-section hidden">
+      <div class="results-header">
+        <h2 id="tagResultsTitle" class="section-title">Browsing: Tag Name</h2>
+        <div class="sort-controls" data-grid="tagGrid">
+          <span>Sort by:</span>
+          <button class="sort-btn active" data-sort="popularity">Popularity</button>
+          <button class="sort-btn" data-sort="date">Date</button>
+          <button class="sort-btn" data-sort="name">Name</button>
+        </div>
+      </div>
+      <div id="tagGrid" class="results-grid"></div>
+      <div id="tagPagination" class="pagination-footer"></div>
+    </div>
+
+    <!-- Search Results Grid -->
+    <div id="resultsSection" class="results-section hidden">
+      <h3 class="results-title">Other Results</h3>
+      <div id="resultsGrid" class="results-grid"></div>
+    </div>
+
+    <!-- Trending Section -->
+    <div id="section-trending" class="trending-section hidden">
+      <div class="trending-header">
+        <h2 class="section-title">🔥 Market Overlook</h2>
+        <div class="market-tabs">
+          <button class="market-tab active" data-type="top100in2weeks">Top Players</button>
+          <button class="market-tab" data-type="topsellers">Top Sellers</button>
+          <button class="market-tab" data-type="trending">New & Trending</button>
+        </div>
+        <div class="sort-controls" data-grid="trendingGrid">
+          <span>Sort by:</span>
+          <button class="sort-btn active" data-sort="popularity">Popularity</button>
+          <button class="sort-btn" data-sort="date">Date</button>
+          <button class="sort-btn" data-sort="name">Name</button>
+        </div>
+      </div>
+      <p id="trendingSub" class="section-sub">Most played Steam games updated daily via SteamSpy</p>
+      <div id="trendingGrid" class="results-grid"></div>
+      <div id="trendingGrid" class="results-grid"></div>
+      <div id="trendingPagination" class="pagination-footer"></div>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <p>Powered by <a href="https://store.steampowered.com" target="_blank">Steam</a>, <a href="https://steamspy.com"
+        target="_blank">SteamSpy</a>, <a href="https://www.cheapshark.com" target="_blank">CheapShark</a>, <a
+        href="https://www.pcgamingwiki.com" target="_blank">PCGamingWiki</a> & <a href="https://www.protondb.com"
+        target="_blank">ProtonDB</a>.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
